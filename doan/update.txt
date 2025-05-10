@@ -1,0 +1,33 @@
+import scipy
+def advanced_heuristic(self, map_data, player_pos):
+    boxes = [(i, j) for i in range(self.rows) for j in range(self.cols) if map_data[i][j] == 'b']
+    goals = self.goals
+
+    # 1. Gán hộp tới đích tối ưu không trùng lặp
+    from scipy.optimize import linear_sum_assignment
+    cost_matrix = [[abs(bi - gi) + abs(bj - gj) for (gi, gj) in goals] for (bi, bj) in boxes]
+    row_ind, col_ind = linear_sum_assignment(cost_matrix)
+    h = sum(cost_matrix[r][c] for r, c in zip(row_ind, col_ind))
+
+    # 2. Thêm khoảng cách từ người tới hộp gần nhất (tùy chọn)
+    if boxes:
+        h += min(abs(player_pos[0] - bi) + abs(player_pos[1] - bj) for (bi, bj) in boxes)
+
+    return h
+# hàm h nâng cao cho a*
+
+def is_deadlock(self, map_data):
+    for (i, j) in [(x, y) for x in range(self.rows) for y in range(self.cols) if map_data[x][y] == 'b']:
+        # Nếu (i, j) là đích thì không sao
+        if (i, j) in self.goals:
+            continue
+
+        # Kiểm tra nếu hộp bị kẹt ở góc (2 tường vuông góc)
+        if ((map_data[i - 1][j] == 'w' or map_data[i + 1][j] == 'w') and
+            (map_data[i][j - 1] == 'w' or map_data[i][j + 1] == 'w')):
+            return True
+
+        # Có thể thêm các kiểm tra nâng cao khác ở đây
+
+    return False
+#  kiểm tra deadlock
