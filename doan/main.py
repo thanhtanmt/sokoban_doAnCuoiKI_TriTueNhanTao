@@ -5,6 +5,10 @@ from move_by_AI import AI
 from SokobanEnv import SokobanEnv
 from q_learning import q_learning
 import numpy as np
+import csv
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
 pygame.init()
 
 width, height = 339, 600
@@ -14,6 +18,51 @@ pygame.display.set_caption("Trò chơi Sokoban")
 
 clock = pygame.time.Clock()
 flag= True
+def plot_data(map_file):
+    data = pd.read_csv(f'data/{map_file}.csv')
+    data_avg = data.groupby('Algorithm').agg({'Time': 'mean', 'Steps': 'mean', 'Path Length': 'mean'}).reset_index()
+
+    plt.figure(figsize=(8, 6))
+    plt.bar(data_avg['Algorithm'], data_avg['Time'], color='skyblue', edgecolor='black')
+    plt.title(f'Average Time for {map_file}', fontsize=16)
+    plt.xlabel('Algorithm', fontsize=12)
+    plt.ylabel('Time (s)', fontsize=12)
+    plt.xticks(rotation=45)  
+    plt.tight_layout() 
+
+def plot_all_maps():
+    plt.figure(figsize=(10, 6))
+    
+    for i in range(1, 13):
+        map_file = f"map{i}"
+        data = pd.read_csv(f'data/{map_file}.csv')
+
+        data_avg = data.groupby('Algorithm').agg({'Time': 'mean', 'Steps': 'mean', 'Path Length': 'mean'}).reset_index()
+
+        plt.plot(data_avg['Algorithm'], data_avg['Time'], marker='o', label=f'Map {i}')  # Vẽ đường với marker
+    
+    plt.xlabel('Algorithm', fontsize=12)
+    plt.ylabel('Time (s)', fontsize=12)
+    plt.title('Average Time for All Maps', fontsize=16)
+    plt.legend(title='Maps', fontsize=10)
+    plt.xticks(rotation=45)
+    plt.tight_layout()  
+    plt.show()
+
+def save_algorithm_result(file_name, algorithm, time_elapsed, steps, path_length):
+
+    folder = 'data'
+    os.makedirs(folder, exist_ok=True) 
+    file_path = os.path.join(folder, file_name)
+    
+    file_exists = os.path.isfile(file_path)
+    
+    with open(file_path, mode='a', newline='') as file:
+        writer = csv.writer(file)
+        if not file_exists:
+            writer.writerow(['Algorithm', 'Time', 'Steps', 'Path Length'])
+        writer.writerow([algorithm, time_elapsed, steps, path_length])
+
 def extract_path_from_pair_qtable(q_raw, start_state):
     path = []
     current = start_state
@@ -59,7 +108,9 @@ def extract_path_from_pair_qtable(q_raw, start_state):
 
     return path
 
-def next_level(map_index):
+def next_level(map_index, path_length, time):
+    print (path_length)
+
     popup=pygame.transform.smoothscale(pygame.image.load(r'assets\images\popup-sheet0.png').convert_alpha(),(279,181))
     btn_nextlevel=pygame.transform.smoothscale(pygame.image.load(r'assets\images\btnnextlevel-sheet0.png').convert_alpha(),(51,51))
     btn_restart=pygame.transform.smoothscale(pygame.image.load(r'assets\images\btnrestart-sheet0.png').convert_alpha(),(51,51))
@@ -70,9 +121,13 @@ def next_level(map_index):
 
     # viết level lên header
     font = pygame.font.SysFont("Arial", 38,  bold=True)
+    font2 = pygame.font.SysFont("Arial", 19,  bold=True)
     text_surface = font.render(f"level {map_index}", True, (0, 0, 0))
+    text_surface2 = font2.render(f"step: {path_length} time: {round(time, 4)}", True, (0, 0, 0))
     transparent_surface = pygame.Surface(text_surface.get_size(), pygame.SRCALPHA) 
     transparent_surface.blit(text_surface, (0, 0))
+    transparent_surface2 = pygame.Surface(text_surface2.get_size(), pygame.SRCALPHA) 
+    transparent_surface2.blit(text_surface2, (0, 0))
     running = True
     while running:
         for event in pygame.event.get():
@@ -92,7 +147,8 @@ def next_level(map_index):
         screen.blit(btn_nextlevel,btn_nextlevel_rect.topleft)
         screen.blit(btn_menu,btn_menu_rect.topleft)
         screen.blit(btn_restart,btn_restart_rect.topleft)
-        screen.blit(transparent_surface, (130, 270)) 
+        screen.blit(transparent_surface, (130, 260)) 
+        screen.blit(transparent_surface2, (90, 310)) 
         
         pygame.display.flip()
 
@@ -123,29 +179,59 @@ def game_play(map_index, label):
     pygame.mixer.music.load("assets\soud\mattoglseby - 4.ogv")
     pygame.mixer.music.play(-1)
     bando_ai=AI(bando.map1,bando.s_side_map1,bando.list_box_map1)
+    step=0
+    time_elapsed=0
+    path=None
+
     if label=="Autoplay":
         check_var=False
     elif label=="BFS":
-        path=bando_ai.bfs()
+        path, time_elapsed, step=bando_ai.bfs()
+        print(path)
+        if path is not None:
+            save_algorithm_result(f'map{map_index}.csv', 'BFS', time_elapsed, step, len(path))
+        else:
+            save_algorithm_result(f'map{map_index}.csv', 'BFS', time_elapsed, step, -1)
     elif label== "A*":
-        path=bando_ai.A_star()
+        path, time_elapsed, step=bando_ai.A_star()
+        print(path)
+        if path is not None:
+            save_algorithm_result(f'map{map_index}.csv', 'A*', time_elapsed, step, len(path))
+        else:
+            save_algorithm_result(f'map{map_index}.csv', 'A*', time_elapsed, step, -1)
     elif label== "Simulated Annealing":
-        a_star_solution = bando_ai.A_star()
-        path = bando_ai.simulated_annealing(a_star_solution)
+        a_star_solution = bando_ai.A_star()[0]
+        path, time_elapsed, step = bando_ai.simulated_annealing(a_star_solution)
+        # path=bando_ai.simulated_annealing(a_star_solution)
+        print(path)
+        if path is not None:
+            save_algorithm_result(f'map{map_index}.csv', 'Simulated Annealing', time_elapsed, step, len(path))
+        else:
+            save_algorithm_result(f'map{map_index}.csv', 'Simulated Annealing', time_elapsed, step, -1)
     elif label== "Partial Observation + A*":
         bando_ai.known_map = [['?' for _ in range(bando_ai.cols)] for _ in range(bando_ai.rows)]
         bando_ai.update_visibility(bando_ai.map, bando_ai.player_pos)
-        path = bando_ai.A_star_partial()
+        path, time_elapsed, step = bando_ai.A_star_partial()
+        print(path)
+        if path is not None:
+            save_algorithm_result(f'map{map_index}.csv', 'Partial Observation + A*', time_elapsed, step, len(path))
+        else:
+            save_algorithm_result(f'map{map_index}.csv', 'Partial Observation + A*', time_elapsed, step, -1)
     elif label== "Backtracking":
-        path = bando_ai.backtracking()
+        path,step, time_elapsed= bando_ai.backtracking()
+        # path=bando_ai.backtracking()
+        print(path)
+        if path is not None:
+            save_algorithm_result(f'map{map_index}.csv', 'Backtracking', time_elapsed, step, len(path))
+        else:
+            save_algorithm_result(f'map{map_index}.csv', 'Backtracking', time_elapsed, step, -1)
     elif label== "Q-Learning":
         env = SokobanEnv(bando_ai)
         q_table = q_learning(env)
         path = extract_path_from_pair_qtable(q_table, start_state=(1, 2))
+        print(path)
     count=0
     path_index=0
-    if path:
-        print(path)
     # viết level lên header
     font = pygame.font.SysFont("Arial", 38)
     text_surface = font.render(f"level {map_index}", True, (255, 255, 255))
@@ -176,7 +262,7 @@ def game_play(map_index, label):
             bando.move_down(pygame.time.get_ticks())
         if (keys[pygame.K_UP]) :
             bando.move_up(pygame.time.get_ticks())
-        if check_var and count>70 and path_index < len(path):
+        if check_var and count>70 and path!= None and path_index < len(path):
             if path[path_index]=='LEFT':
                 bando.move_left(pygame.time.get_ticks())
                 path_index+=1
@@ -210,7 +296,7 @@ def game_play(map_index, label):
         
         pygame.display.flip()
         if bando.is_finished():
-            next_level(map_index)
+            next_level(map_index, 0 if path==None else len(path), time_elapsed)
             running= False
             break
         clock.tick(60)
@@ -445,11 +531,79 @@ def menu():
         pygame.display.flip()
         # clock.tick(60)
 
+def data():
+    WHITE = (255, 255, 255)
+    BLUE = (0, 0, 255)
+    RED = (255, 0, 0)
+    GREEN = (0, 255, 0)
+    LIGHT_BLUE = (100, 100, 255)
+    LIGHT_GREEN = (100, 255, 100)
+
+    # Kích thước nút
+    BUTTON_WIDTH = 200
+    BUTTON_HEIGHT = 30
+
+    def draw_buttons(mouse_pos, mouse_pressed):
+        font = pygame.font.Font(None, 20)
+        
+        for i in range(12):
+            # Kiểm tra vị trí chuột để thay đổi màu khi rê chuột hoặc nhấn
+            if 50 <= mouse_pos[0] <= 50 + BUTTON_WIDTH and 50 + i * (BUTTON_HEIGHT + 10) <= mouse_pos[1] <= 50 + i * (BUTTON_HEIGHT + 10) + BUTTON_HEIGHT:
+                button_color = LIGHT_BLUE if not mouse_pressed else BLUE  # Màu khi rê chuột hoặc nhấn
+            else:
+                button_color = BLUE
+            
+            # Vẽ nút với bo góc và hiệu ứng gradient
+            pygame.draw.rect(screen, button_color, (50, 50 + i * (BUTTON_HEIGHT + 10), BUTTON_WIDTH, BUTTON_HEIGHT), border_radius=15)
+            text = font.render(f"Level {i + 1}", True, WHITE)
+            screen.blit(text, (50 + 30, 50 + i * (BUTTON_HEIGHT + 10) + 10))
+        
+        # Vẽ nút tổng hợp (Level 13)
+        if 50 <= mouse_pos[0] <= 50 + BUTTON_WIDTH and 50 + 12 * (BUTTON_HEIGHT + 10) <= mouse_pos[1] <= 50 + 12 * (BUTTON_HEIGHT + 10) + BUTTON_HEIGHT:
+            button_color = LIGHT_GREEN if not mouse_pressed else GREEN  # Màu khi rê chuột hoặc nhấn
+        else:
+            button_color = GREEN
+        
+        # Vẽ nút tổng hợp
+        pygame.draw.rect(screen, button_color, (50, 50 + 12 * (BUTTON_HEIGHT + 10), BUTTON_WIDTH, BUTTON_HEIGHT), border_radius=15)
+        text = font.render("All in", True, WHITE)
+        screen.blit(text, (50 + 30, 50 + 12 * (BUTTON_HEIGHT + 10) + 10))
+
+    running = True
+    mouse_pressed = False  # Biến theo dõi việc nhấn chuột
+    while running:
+        screen.fill(WHITE)  # Màu nền cửa sổ
+        mouse_pos = pygame.mouse.get_pos()  # Lấy vị trí chuột
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                mouse_pressed = True  # Khi nhấn chuột
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                mouse_pressed = False  # Khi thả chuột
+            
+        draw_buttons(mouse_pos, mouse_pressed)  # Vẽ các nút
+        
+        # Kiểm tra các sự kiện nhấn chuột để thực thi hành động
+        if mouse_pressed:
+            for i in range(12):
+                if 50 <= mouse_pos[0] <= 50 + BUTTON_WIDTH and 50 + i * (BUTTON_HEIGHT + 10) <= mouse_pos[1] <= 50 + i * (BUTTON_HEIGHT + 10) + BUTTON_HEIGHT:
+                    map_file = f"map{i + 1}"
+                    plot_data(map_file)
+            
+            # Kiểm tra nút tổng hợp (Level 13)
+            if 50 <= mouse_pos[0] <= 50 + BUTTON_WIDTH and 50 + 12 * (BUTTON_HEIGHT + 10) <= mouse_pos[1] <= 50 + 12 * (BUTTON_HEIGHT + 10) + BUTTON_HEIGHT:
+                plot_all_maps()
+
+        pygame.display.flip()  # Cập nhật cửa sổ
+
 def waiting_hall():
     login1=pygame.transform.smoothscale(pygame.image.load(r'assets\images\bgm-sheet0.png').convert_alpha(),(339,600))
     login2=pygame.transform.smoothscale(pygame.image.load(r'assets\images\gametitle-sheet0.png').convert_alpha(),(339,200))
     btn_play=pygame.transform.smoothscale(pygame.image.load(r'assets\images\btnplay-sheet0.png').convert_alpha(),(174,58))
-
+    btn_data=pygame.transform.smoothscale(pygame.image.load(r'assets\images\btnundo-sheet0.png').convert_alpha(),(50,50))
+    btn_data_rect=btn_data.get_rect(topleft=(0,0))
     btn_play_rect = btn_play.get_rect(topleft=(83, 271))
     running=True
     while running:
@@ -460,10 +614,13 @@ def waiting_hall():
                 if btn_play_rect.collidepoint(event.pos):
                     menu()
                     running=False
+                if btn_data_rect.collidepoint(event.pos):
+                    data()
 
         screen.blit(login1,(0,0))
         screen.blit(login2,(0,0))
         screen.blit(btn_play,(83,271))
+        screen.blit(btn_data, btn_data_rect.topleft)
         
         pygame.display.flip()
 

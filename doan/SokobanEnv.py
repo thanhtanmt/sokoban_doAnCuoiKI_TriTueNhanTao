@@ -8,39 +8,36 @@ class SokobanEnv:
         self.reset()
 
     def reset(self):
-        # Reset lại bản đồ gốc
         self.map = self.ai.copy_map(self.ai.map)
         self.s_pos = self.ai.player_pos
         self.done = False
         return self._get_state()
 
     def _get_state(self):
-        # Bạn có thể trích xuất thông tin gọn hơn để giảm không gian trạng thái
-        # Ở đây ta mã hóa bằng vị trí người + vị trí hộp
         box_positions = [(i, j) for i in range(self.ai.rows) for j in range(self.ai.cols) if self.map[i][j] == 'b']
-        return (self.s_pos, tuple(sorted(box_positions)))
-
+        return (self.s_pos, tuple(sorted(box_positions))) 
     def step(self, action):
-        moves = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # UP, DOWN, LEFT, RIGHT
+        moves = [(-1, 0), (1, 0), (0, -1), (0, 1)]
         dx, dy = moves[action]
+
+        old_boxes_on_goal = sum(1 for b in self.ai.goals if self.map[b[0]][b[1]] == 'b')
 
         result = self.ai._try_move(self.map, self.s_pos, dx, dy)
         if result is None:
-            # Đụng tường hoặc không hợp lệ → hình phạt
             return self._get_state(), -1, False
 
         self.map, self.s_pos = result
 
-        # Kiểm tra thắng
-        if self.ai.is_finished(self.map):
-            self.done = True
-            return self._get_state(), 10, True  # Phần thưởng lớn khi hoàn thành
+        new_boxes_on_goal = sum(1 for b in self.ai.goals if self.map[b[0]][b[1]] == 'b')
 
-        # Bước hợp lệ nhưng chưa xong
-        return self._get_state(), -0.1, False  # Phạt nhẹ để khuyến khích kết thúc nhanh
+        reward = (new_boxes_on_goal - old_boxes_on_goal) * 1.0
+
+        if self.ai.is_finished(self.map):
+            return self._get_state(), reward + 10, True
+
+        return self._get_state(), reward - 0.1, False
 
     def render(self):
-        # Hiển thị map (nếu bạn muốn gắn vào pygame hoặc in ra terminal)
         for row in self.map:
             print(''.join(row))
         print()

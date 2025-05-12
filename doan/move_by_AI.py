@@ -4,6 +4,7 @@ from collections import deque
 import heapq
 import random
 import math
+import time
 
 class AI:
     def __init__(self, raw_map, s_pos_raw, box_pos_raw):
@@ -11,6 +12,7 @@ class AI:
         self.cols = len(raw_map[0])
         self.map = [['0' for _ in range(self.cols)] for _ in range(self.rows)] 
         self.known_map = [['?' for _ in range(self.cols)] for _ in range(self.rows)]
+        self.step_backtracking=0
 
 
         # Vị trí các đối tượng
@@ -71,6 +73,8 @@ class AI:
     
     # nhóm thuật toán thứ nhất chọn bfs
     def bfs(self):
+        start_time = time.time()
+        steps = 0
         start_map = self.copy_map(self.map)
         start_pos = self.player_pos
         queue = deque([(start_map, [], start_pos)])
@@ -79,10 +83,13 @@ class AI:
         visited.add(self._hash_state(start_map, start_pos))
 
         while queue:
+            steps += 1
             current_map, path, s_pos = queue.popleft()
 
             if self.is_finished(current_map):
-                return path
+                end_time = time.time()
+                time_elapsed = end_time - start_time
+                return path, time_elapsed, steps
 
             for dx, dy, move in [(-1, 0, 'UP'), (1, 0, 'DOWN'), (0, -1, 'LEFT'), (0, 1, 'RIGHT')]:
                 result = self._try_move(current_map, s_pos, dx, dy)
@@ -94,10 +101,14 @@ class AI:
                 if state_hash not in visited:
                     visited.add(state_hash)
                     queue.append((self.copy_map(new_map), path + [move], new_pos))  # đảm bảo mỗi map là bản riêng
+        end_time = time.time()
+        time_elapsed = end_time - start_time
 
-        return None
+        return None, time_elapsed, steps
     # nhóm thuật toán thứ 2 chọn A*
     def A_star(self):
+        start_time = time.time()
+        steps = 0
         start_map = self.copy_map(self.map)
         start_pos = self.player_pos
         start_h = self.heuristic(start_map)
@@ -107,10 +118,14 @@ class AI:
         visited.add(self._hash_state(start_map, start_pos))
 
         while queue:
+            steps += 1
             f, g, current_map, path, s_pos = heapq.heappop(queue)
 
             if self.is_finished(current_map):
-                return path
+                end_time = time.time()
+                time_elapsed = end_time - start_time
+                return path, time_elapsed, steps
+
 
             for dx, dy, move in [(-1, 0, 'UP'), (1, 0, 'DOWN'), (0, -1, 'LEFT'), (0, 1, 'RIGHT')]:
                 result = self._try_move(current_map, s_pos, dx, dy)
@@ -126,8 +141,11 @@ class AI:
                     visited.add(state_hash)
                     h = self.heuristic(new_map)
                     heapq.heappush(queue, (g + 1 + h, g + 1, self.copy_map(new_map), path + [move], new_pos))
+        
+        end_time = time.time()
+        time_elapsed = end_time - start_time
 
-        return None
+        return None, time_elapsed, steps
     
     def heuristic(self, map_data):
         boxes = [(i, j) for i in range(self.rows) for j in range(self.cols) if map_data[i][j] == 'b']
@@ -143,6 +161,26 @@ class AI:
         # Đếm số bước là đơn giản nhất
         return len(path)
     
+    def execute_path(self, path):
+        current_map = self.copy_map(self.map)
+        s_pos = self.player_pos
+
+        for move in path:
+            dx, dy = {
+                'UP': (-1, 0),
+                'DOWN': (1, 0),
+                'LEFT': (0, -1),
+                'RIGHT': (0, 1)
+            }[move]
+
+            result = self._try_move(current_map, s_pos, dx, dy)
+            if result is None:
+                return None  # Bước không hợp lệ
+
+            current_map, s_pos = result
+
+        return current_map, s_pos
+
     def mutate_path(self, path):
         if len(path) < 2:
             return path[:]
@@ -154,23 +192,35 @@ class AI:
         return new_path
 
     def simulated_annealing(self, initial_path, max_iter=1000, T=100.0, alpha=0.99):
+        start_time = time.time()
+        steps = 0
         current_path = initial_path
         current_score = self.evaluate(current_path)
 
         for _ in range(max_iter):
+            steps += 1
             new_path = self.mutate_path(current_path)
-            new_score = self.evaluate(new_path)
+            executed = self.execute_path(new_path)
+            if executed is None:
+                continue  # Đường đi không hợp lệ, bỏ qua
 
+            new_map, _ = executed
+            if not self.is_finished(new_map):
+                continue  # Không giải xong, bỏ qua
+
+            new_score = self.evaluate(new_path)
             delta = new_score - current_score
+
             if delta < 0 or random.random() < math.exp(-delta / T):
                 current_path = new_path
                 current_score = new_score
 
-            T *= alpha  # Giảm nhiệt độ
+            T *= alpha # Giảm nhiệt độ
+        time_elapsed = time.time() - start_time
+        return current_path, time_elapsed, max_iter
 
-        return current_path
     #nhóm thuật toán thứ 4 omplex Environment chọn Partial Observation + A*
-    def update_visibility(self, real_map, s_pos, vision_range=1):
+    def update_visibility(self, real_map, s_pos, vision_range=2):
         x, y = s_pos
         for dx in range(-vision_range, vision_range + 1):
             for dy in range(-vision_range, vision_range + 1):
@@ -179,6 +229,8 @@ class AI:
                     self.known_map[nx][ny] = real_map[nx][ny]
 
     def A_star_partial(self):
+        start_time = time.time()
+        steps = 0
         start_map = self.known_map
         start_pos = self.player_pos
         start_h = self.heuristic(start_map)
@@ -188,10 +240,14 @@ class AI:
         visited.add(self._hash_state(start_map, start_pos))
 
         while queue:
+            steps += 1
             f, g, current_map, path, s_pos = heapq.heappop(queue)
 
             if self.is_finished(current_map):
-                return path
+                end_time = time.time()
+                time_elapsed = end_time - start_time
+                return path, time_elapsed, steps
+
 
             self.update_visibility(self.map, s_pos)  # Cập nhật tầm nhìn
 
@@ -215,10 +271,15 @@ class AI:
                     h = self.heuristic(new_map)
                     heapq.heappush(queue, (g + 1 + h, g + 1, self.copy_map(new_map), path + [move], new_pos))
 
-        return []  # Không tìm thấy đường đi
+        end_time = time.time()
+        time_elapsed = end_time - start_time
+        return None, time_elapsed, steps
     
     # nhóm thuật toán thứ 5CSPs (Constraint Satisfaction Problems) chọn Backtracking
     def backtracking(self, current_map=None, path=None, visited=None, s_pos=None):
+        start_time = time.time()  
+        self.step_backtracking += 1 
+        
         if current_map is None:
             current_map = self.copy_map(self.map)
             path = []
@@ -226,24 +287,29 @@ class AI:
             s_pos = self.player_pos
 
         if self._hash_state(current_map, s_pos) in visited:
-            return None
+            return None, self.step_backtracking, time.time() - start_time 
 
         if self.is_finished(current_map):
-            return path
-
-        visited.add(self._hash_state(current_map, s_pos))
-
+            end_time = time.time()  
+            time_elapsed = end_time - start_time
+            return path, self.step_backtracking, time_elapsed 
+        visited.add(self._hash_state(current_map, s_pos))  
         for dx, dy, move in [(-1, 0, 'UP'), (1, 0, 'DOWN'), (0, -1, 'LEFT'), (0, 1, 'RIGHT')]:
             result = self._try_move(current_map, s_pos, dx, dy)
             if result is None:
                 continue
             new_map, new_pos = result
-            
-            res_path = self.backtracking(self.copy_map(new_map), path + [move], visited, new_pos)
+        
+            res_path, steps, time_elapsed = self.backtracking(self.copy_map(new_map), path + [move], visited, new_pos)
             if res_path is not None:
-                return res_path
+                return res_path, steps, time_elapsed
+        
+        end_time = time.time() 
+        time_elapsed = end_time - start_time
 
-        return None
+        return None, self.step_backtracking, time_elapsed  
+
+
 
 
 
