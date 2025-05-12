@@ -31,6 +31,17 @@ Dự án tích hợp **6 nhóm thuật toán AI** được hiện thực trong f
 
 ---
 
+## 📊 So sánh các thuật toán AI
+
+| Thuật toán                   | Loại thuật toán         | Chiến lược tìm kiếm       | Ưu điểm chính                                      | Nhược điểm chính                                         |
+|-----------------------------|--------------------------|---------------------------|---------------------------------------------------|----------------------------------------------------------|
+| **BFS**                     | Tìm kiếm không heuristic | Rộng trước (Breadth-First)| Đảm bảo tìm đường đi ngắn nhất (nếu có)          | Rất tốn bộ nhớ, không hiệu quả cho không gian lớn        |
+| **A\***                    | Tìm kiếm có heuristic    | f(n) = g(n) + h(n)        | Nhanh hơn BFS, có thể tối ưu hóa                 | Phụ thuộc vào chất lượng hàm heuristic                  |
+| **Simulated Annealing**     | Tìm kiếm cục bộ          | Ngẫu nhiên, làm nguội     | Có thể thoát khỏi cực trị cục bộ                 | Không đảm bảo tìm được lời giải                         |
+| **Partial Obs. + A\***     | Tìm kiếm tầm nhìn giới hạn | A* trong môi trường hạn chế | Thực tế hơn với môi trường quan sát một phần     | Kết quả không ổn định do giới hạn tầm nhìn              |
+| **Backtracking**            | CSP (ràng buộc)           | Quay lui toàn không gian  | Đơn giản, dễ hiện thực                           | Rất chậm và dễ bị lặp trạng thái                        |
+| **Q-Learning**              | Học tăng cường (RL)       | Học từ tương tác môi trường | Có khả năng học và cải thiện theo thời gian      | Cần huấn luyện nhiều, kết quả không ổn định ban đầu     |
+
 ## 🎥 Demo hoạt động của thuật toán
 
 ### ✅ Giải bằng BFS:
