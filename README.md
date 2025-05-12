@@ -46,7 +46,8 @@ Dự án tích hợp **6 nhóm thuật toán AI** được hiện thực trong f
 
 ### ✅ Giải bằng BFS:
 ![BFS Demo](1.gif)
-
+### Giải bằng Partial Observation + A*
+![Partial Observation + A* Demo](3.gif)
 ### 🔁 Giải bằng Backtracking:
 ![Backtracking Demo](2.gif)
 
